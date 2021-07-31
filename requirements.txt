@@ -4,3 +4,5 @@ tqdm
 tensorboard
 ml-collections
 apex==0.9.10dev
+scipy
+torchvision
