@@ -86,7 +86,7 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
-def valid(args, model, writer, test_loader, global_step):
+def valid(args, model, test_loader, global_step):
     # Validation!
     eval_losses = AverageMeter()
 
@@ -134,7 +134,7 @@ def valid(args, model, writer, test_loader, global_step):
     logger.info("Valid Loss: %2.5f" % eval_losses.avg)
     logger.info("Valid Accuracy: %2.5f" % accuracy)
 
-    writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
+    # writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
     return accuracy
 
 
@@ -142,7 +142,7 @@ def train(args, model):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         os.makedirs(args.output_dir, exist_ok=True)
-        writer = SummaryWriter(log_dir=os.path.join("logs", args.name))
+        # writer = SummaryWriter(log_dir=os.path.join("logs", args.name))
 
     args.train_batch_size = args.train_batch_size // args.gradient_accumulation_steps
 
@@ -218,10 +218,11 @@ def train(args, model):
                     "Training (%d / %d Steps) (loss=%2.5f)" % (global_step, t_total, losses.val)
                 )
                 if args.local_rank in [-1, 0]:
-                    writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
-                    writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
+                    # writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
+                    # writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
+                    pass
                 if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
-                    accuracy = valid(args, model, writer, test_loader, global_step)
+                    accuracy = valid(args, model, test_loader, global_step)
                     if best_acc < accuracy:
                         save_model(args, model)
                         best_acc = accuracy
@@ -234,7 +235,8 @@ def train(args, model):
             break
 
     if args.local_rank in [-1, 0]:
-        writer.close()
+        # writer.close()
+        pass
     logger.info("Best Accuracy: \t%f" % best_acc)
     logger.info("End Training!")
 
@@ -308,8 +310,11 @@ def main():
     args.device = device
 
     # Setup logging
+    log_path = os.path.join("logs", args.name)
+    handlers = [logging.FileHandler(log_path, mode='a+'),
+                logging.StreamHandler()]
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
+                        datefmt='%m/%d/%Y %H:%M:%S', handlers=handlers,
                         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
     logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s" %
                    (args.local_rank, args.device, args.n_gpu, bool(args.local_rank != -1), args.fp16))
