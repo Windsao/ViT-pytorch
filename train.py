@@ -310,10 +310,10 @@ def main():
     args.device = device
 
     # Setup logging
-    log_path = os.path.join("logs", args.name)
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
-    
+    log_dir = os.path.join("logs", args.name)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_path = log_path = os.path.join(log_dir, 'output.log')
     handlers = [logging.FileHandler(log_path, mode='a+'),
                 logging.StreamHandler()]
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
