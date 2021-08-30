@@ -29,6 +29,7 @@ wget https://storage.googleapis.com/vit_models/imagenet21k+imagenet2012/{MODEL_N
 ```
 
 ### 2. Train Model
+#### 2.1 Cifar10 dataset training
 ```
 python3 train.py --name cifar10-100_500 --dataset cifar10 --model_type ViT-B_16 --pretrained_dir checkpoint/ViT-B_16.npz
 ```
@@ -39,6 +40,10 @@ The default batch size is 512. When GPU memory is insufficient, you can proceed 
 Also can use [Automatic Mixed Precision(Amp)](https://nvidia.github.io/apex/amp.html) to reduce memory usage and train faster
 ```
 python3 train.py --name cifar10-100_500 --dataset cifar10 --model_type ViT-B_16 --pretrained_dir checkpoint/ViT-B_16.npz --fp16 --fp16_opt_level O2
+```
+#### 2.2 ImageNet1k training
+```
+python3 train.py --name imageNet1k_300 --dataset imageNet1K --model_type ViT-B_16 --pretrained_dir checkpoint/ViT-B_16.npz
 ```
 
 
