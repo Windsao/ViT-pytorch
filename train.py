@@ -1,4 +1,4 @@
-# coding=GBK
+# coding=utf-8
 from __future__ import absolute_import, division, print_function
 
 import logging
@@ -58,8 +58,12 @@ def save_model(args, model):
 def setup(args):
     # Prepare model
     config = CONFIGS[args.model_type]
-
-    num_classes = 10 if args.dataset == "cifar10" else 100
+    if args.dataset == "cifar10":
+        num_classes = 10  
+    elif args.dataset == "cifar100":
+        num_classes = 100
+    elif args.dataset == "imageNet1K":
+        num_classes = 1000
 
     model = VisionTransformer(config, args.img_size, zero_head=True, num_classes=num_classes)
     model.load_from(np.load(args.pretrained_dir))
@@ -86,7 +90,7 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
-def valid(args, model, test_loader, global_step):
+def valid(args, model, writer, test_loader, global_step):
     # Validation!
     eval_losses = AverageMeter()
 
@@ -134,7 +138,7 @@ def valid(args, model, test_loader, global_step):
     logger.info("Valid Loss: %2.5f" % eval_losses.avg)
     logger.info("Valid Accuracy: %2.5f" % accuracy)
 
-    # writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
+    writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
     return accuracy
 
 
@@ -142,7 +146,7 @@ def train(args, model):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         os.makedirs(args.output_dir, exist_ok=True)
-        # writer = SummaryWriter(log_dir=os.path.join("logs", args.name))
+        writer = SummaryWriter(log_dir=os.path.join("logs", args.name))
 
     args.train_batch_size = args.train_batch_size // args.gradient_accumulation_steps
 
@@ -218,11 +222,10 @@ def train(args, model):
                     "Training (%d / %d Steps) (loss=%2.5f)" % (global_step, t_total, losses.val)
                 )
                 if args.local_rank in [-1, 0]:
-                    # writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
-                    # writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
-                    pass
+                    writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
+                    writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
                 if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
-                    accuracy = valid(args, model, test_loader, global_step)
+                    accuracy = valid(args, model, writer, test_loader, global_step)
                     if best_acc < accuracy:
                         save_model(args, model)
                         best_acc = accuracy
@@ -235,8 +238,7 @@ def train(args, model):
             break
 
     if args.local_rank in [-1, 0]:
-        # writer.close()
-        pass
+        writer.close()
     logger.info("Best Accuracy: \t%f" % best_acc)
     logger.info("End Training!")
 
@@ -246,7 +248,7 @@ def main():
     # Required parameters
     parser.add_argument("--name", required=True,
                         help="Name of this run. Used for monitoring.")
-    parser.add_argument("--dataset", choices=["cifar10", "cifar100"], default="cifar10",
+    parser.add_argument("--dataset", choices=["cifar10", "cifar100", "imageNet1K"], default="cifar10",
                         help="Which downstream task.")
     parser.add_argument("--model_type", choices=["ViT-B_16", "ViT-B_32", "ViT-L_16",
                                                  "ViT-L_32", "ViT-H_14", "R50-ViT-B_16"],
@@ -259,7 +261,7 @@ def main():
 
     parser.add_argument("--img_size", default=224, type=int,
                         help="Resolution size")
-    parser.add_argument("--train_batch_size", default=512, type=int,
+    parser.add_argument("--train_batch_size", default=128, type=int,
                         help="Total batch size for training.")
     parser.add_argument("--eval_batch_size", default=64, type=int,
                         help="Total batch size for eval.")
@@ -275,7 +277,7 @@ def main():
                         help="Total number of training epochs to perform.")
     parser.add_argument("--decay_type", choices=["cosine", "linear"], default="cosine",
                         help="How to decay the learning rate.")
-    parser.add_argument("--warmup_steps", default=500, type=int,
+    parser.add_argument("--warmup_steps", default=100, type=int,
                         help="Step of training to perform learning rate warmup for.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float,
                         help="Max gradient norm.")
@@ -310,14 +312,8 @@ def main():
     args.device = device
 
     # Setup logging
-    log_dir = os.path.join("logs", args.name)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    log_path = log_path = os.path.join(log_dir, 'output.log')
-    handlers = [logging.FileHandler(log_path, mode='a+'),
-                logging.StreamHandler()]
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S', handlers=handlers,
+                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
     logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s" %
                    (args.local_rank, args.device, args.n_gpu, bool(args.local_rank != -1), args.fp16))
